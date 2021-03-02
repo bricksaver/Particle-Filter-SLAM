@@ -1,0 +1,115 @@
+Project 2: Particle Filter SLAM
+
+Project Overview
+1. Implement SLAM using odometry, 2D Lidar scans, stereo camera measurements
+- odometry, lidar: localize robot, build 2D occupancy grid map of environment
+- stereo camera: add RGB texture to 2D map
+
+Project Details
+- use 2D lidar, fiber optic gyro (FOG), encoders data to localize and map
+- use stereo cameras for texture mapping
+- all parameters/static transformations in param folder
+- all transformations for sensor to body frame (bTs) provided
+- FOG provides relative rotational motion between consecutive time stamps
+  - data used as delta(theta) = tau*w which are yaw angle change, time discritization, angular velocity
+- 2D lidar, encoders, FOG data in .csv format
+  - 1st column of every file is timestamp
+- Stereo cameras
+  - each file named based on timestamp of picture
+
+- Goal: Use particle filter w/ differential-drive motion model and scan-grid correlation observation model
+        for simultaneous localization and occupancy-grid mapping
+- particle filter: https://natanaso.github.io/ece276a/ref/ECE276A_8_BayesianFiltering.pdf
+- differential-drive motion mode: Lecture 9, Slide 20
+- scan-grid correlation observation model: 
+- occupancy-grid mapping: Lecture 9, Slide 10
+- log-odds map: Lecture 9, Slide 17
+- localization: Lecture 9 , Slide 18
+- SLAM: https://natanaso.github.io/ece276a/ref/ECE276A_9_ParticleFilterSLAM.pdf
+
+- OUTLINE of NECESSARY Operations
+- MAPPING:
+  - *map using 1st lidar scan, then display map (world frame)
+  - make sure your transforms are correct before estimating robot pose
+  - remove scan points (not rows) too close or too far (include 2-75m measurements)
+  - *Transform lidar points from lidar frame to world frame
+    - use pose of car to transform measurements from body frame to world frame)
+    - at 1st timestep (t=0), robot body frame same as world frame, so wTv = I at t=0
+    - choose IMU frame as body frame is easiest w/ world frame height same as IMU height
+  - *use bresenham2D or cv2.drawContours to obtain occupied cells and free cells that correspond to lidar scan
+    - we only ever want a map composed of cells
+  - use pose of car to transform measurements from body frame to world frame
+  - Update map log-odds according to these observations after every laser scan
+    - use log-odds to calculate probability of cell of cell map of being occupied after every laser data
+- PREDICTION: 
+  - implement prediction-only particle filter first to estimate vehicle position in world map
+    - each particle is an estimate of possible vehicle position
+  - use encoders and FOG data to compute instantaneous linear/angular velocities v_t and w_t
+    - estimate robot tranjectory via differential drive motion model
+      - use encoder information here
+    - v = velocity from encoder data
+    - w = angular velocity from 3rd column of FOG data (delta yaw)
+    - tau = time stamp difference in FOG data in seconds
+    - For encoder reality check, velocity should be ~30mph
+  - based on estimate, build 2D map before correcting map with lidar readings
+    - lidar scans are used in map correlation part in prediction
+      - Update map log-odds according to these observations after every laser scan
+      - use log-odds to calculate probability of cell of cell map of being occupied after every laser data
+  - check prediction correctness using dead-reckoning (prediction w/o noise and a single particle
+    - plot robot trajectory
+- UPDATE:
+  - Once prediction-only filter works, include update step that uses scan-grid correlation to correct robot pose
+    - update with laser correlation model which causes particle to go closer to actual location
+    - resample particles using SIR resampling if needed
+  - Remove scan points too close or far
+  - Try update step with 3-4 particles to see if weight updates make sense
+  - Transform lidar scan to world frame using each particle's pose hypothesis
+  - Compute correlation between world-frame scan and occupancy map using mapCorrelation
+  - Call mapCorrelation with grid of values (9x9) around current particle's position to get good correlation (See p2_utils.py)
+  - Consider adding variation in yaw of each particle to get good results
+- TEXTURE MAP:
+  - Compute disparity image from stereo image pairs using provided script in p2_utils.py via stereo camera model
+  - Project colored points from left camera onto occupancy grid to color it
+  - Determine depth of each Rgb pixel from disparity map and transform RGB values to world frame
+  - Find plane that corresponds to occupancy grid in transformed data via thresholding on the height
+  - Color cells in occupancy grid with RGB values according to project points that belong to its plane
+
+PR2_UTILS.PY
+tic()
+toc()
+compute stereo()
+  - output: disparity
+read_data_from_csv(filename)
+  - output: timestamp + data (numpy array w/ sensor data in each row)
+mapCorrelation(im, x_im, y_im, vp, xs, ys)
+  - input:
+    - im: map
+    - x_im, y_im: physical x,y postiions of grid map cells
+    - vp[0:2,:]: occupied x,y positions from range sensor in physical unit
+    - xs, ys: physical x,y positions you want to evaluate correlation
+  - output:
+    - cpr: sum of cell values of all positions hit by range sensor
+bresenham2D
+  - input:
+    - (sx,sy): start point of ray
+    - (ex,ey): end point of ray
+  - output:
+    - np.vstack(x,y): coordinates of positions passed through by ray
+test_bresenham2D()
+test_mapCorrelation()
+  - input: 
+show_lidar()
+  - output:
+    - angles
+    - ranges
+
+
+
+
+
+
+
+
+
+
+
